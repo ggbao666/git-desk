@@ -10,6 +10,12 @@ let dropFallbackTimer = null
 let lastDropKey = ''
 let lastDropAt = 0
 
+// 启动页使用紧凑小窗口，进入工作台后放大
+const WINDOW_SIZE = {
+  welcome:   { w: 440, h: 620, minW: 400, minH: 520 },
+  workspace: { w: 1120, h: 760, minW: 880, minH: 580 },
+}
+
 // ---------------------------------------------------------------------------
 // 视图
 // ---------------------------------------------------------------------------
@@ -18,14 +24,33 @@ function applyTheme(theme) {
   document.body.classList.toggle('light', theme === 'light')
 }
 
+function applyWindowSize(mode) {
+  const r = rt()
+  if (!r) return
+  const s = WINDOW_SIZE[mode] || WINDOW_SIZE.welcome
+  try {
+    // 缩小要先放宽最小尺寸，放大则相反，否则会被 min size 撑住
+    if (mode === 'welcome') {
+      r.WindowSetMinSize?.(s.minW, s.minH)
+      r.WindowSetSize?.(s.w, s.h)
+    } else {
+      r.WindowSetSize?.(s.w, s.h)
+      r.WindowSetMinSize?.(s.minW, s.minH)
+    }
+    r.WindowCenter?.()
+  } catch { /* 运行时未就绪时忽略 */ }
+}
+
 function showWorkspace() {
   $('#welcome').hidden = true
   $('#workspace').hidden = false
+  applyWindowSize('workspace')
 }
 
 function showWelcome() {
   $('#workspace').hidden = true
   $('#welcome').hidden = false
+  applyWindowSize('welcome')
   void welcome.renderRecent()
   void welcome.refreshGitInfo()
 }
@@ -321,7 +346,10 @@ async function boot() {
   // 命令行参数 / 拖到 exe 图标上启动
   try {
     const startupDir = await App.GetStartupDir()
-    if (startupDir) await openFromPath(startupDir, { quiet: true })
+    if (startupDir) {
+      const ok = await openFromPath(startupDir, { quiet: true })
+      if (!ok) applyWindowSize('welcome') // 启动参数无效时回到紧凑窗口
+    }
   } catch { /* 忽略无效的启动参数 */ }
 }
 

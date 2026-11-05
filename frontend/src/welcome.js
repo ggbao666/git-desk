@@ -52,27 +52,27 @@ export function setDropActive(active) {
   $('#drop-zone')?.classList.toggle('is-over', active)
 }
 
+function setGitInfo(node, state, text, title) {
+  node.className = `git-info ${state}`
+  node.innerHTML = ''
+  node.appendChild(el('span', { class: 'dot' }))
+  node.appendChild(el('span', { class: 'git-info-text', text }))
+  node.title = title || text
+}
+
 export async function refreshGitInfo() {
   const info = $('#wc-git-info')
   if (!info) return
   try {
     const r = await App.GitDetect(false)
     if (r?.ok) {
-      info.className = 'git-info ok'
-      info.innerHTML = ''
-      info.appendChild(el('span', { class: 'dot' }))
-      info.appendChild(document.createTextNode(`${r.version} · ${r.path}`))
-      info.title = `${r.version}\n${r.path}\n来源：${r.source === 'auto' ? '自动探测' : '手动指定'}`
+      setGitInfo(info, 'ok', `${r.version} · ${r.path}`,
+        `${r.version}\n${r.path}\n来源：${r.source === 'auto' ? '自动探测' : '手动指定'}`)
     } else {
-      info.className = 'git-info bad'
-      info.innerHTML = ''
-      info.appendChild(el('span', { class: 'dot' }))
-      info.appendChild(document.createTextNode(r?.error || '未检测到 Git'))
-      info.title = r?.error || ''
+      setGitInfo(info, 'bad', r?.error || '未检测到 Git')
     }
   } catch (err) {
-    info.className = 'git-info bad'
-    info.textContent = 'Git 检测失败：' + String(err?.message || err)
+    setGitInfo(info, 'bad', 'Git 检测失败：' + String(err?.message || err))
   }
 }
 

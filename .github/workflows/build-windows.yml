@@ -1,0 +1,87 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-latest
+    env:
+      # Wails v2 在 Windows 上为纯 Go 实现，不需要 gcc / CGO
+      CGO_ENABLED: '0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1
+          $goBin = Join-Path (go env GOPATH) 'bin'
+          $goBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Output "Wails CLI installed to $goBin"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # wails build 会按 wails.json 执行 npm install + npm run build，
+      # 生成 Wails 绑定与 Windows 资源，最后 go build 内嵌 frontend/dist。
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          wails build -platform windows/amd64 -trimpath -v 1
+          $exe = 'build/bin/GitDesk.exe'
+          if (-not (Test-Path $exe)) { throw "Build failed: $exe was not created" }
+          $f = Get-Item $exe
+          Write-Output ("Built: {0} ({1:N2} MB)" -f $f.FullName, ($f.Length / 1MB))
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GitDesk-Windows-x64
+          path: build/bin/GitDesk.exe
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $exe = 'build/bin/GitDesk.exe'
+          gh release view $tag --repo $repo | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $exe --clobber --repo $repo
+          } else {
+            gh release create $tag $exe --generate-notes --title "GitDesk $tag" --repo $repo
+          }
+          if ($LASTEXITCODE -ne 0) { throw "发布 Release 失败" }
