@@ -3,12 +3,10 @@ import { $, el, basename, formatTime, toast, confirmDialog } from './ui.js'
 
 let onOpenRepo = () => {}
 let onSettings = () => {}
-let onEditIgnore = () => {}
 
 export function initWelcome(handlers = {}) {
   onOpenRepo = handlers.onOpenRepo || onOpenRepo
   onSettings = handlers.onSettings || onSettings
-  onEditIgnore = handlers.onEditIgnore || onEditIgnore
 
   $('#wc-pick').addEventListener('click', async () => {
     try {
@@ -21,17 +19,6 @@ export function initWelcome(handlers = {}) {
   })
 
   $('#wc-settings').addEventListener('click', onSettings)
-
-  // 启动页也能选仓库编辑 .gitignore（后端会自动定位到仓库根并校验）
-  $('#wc-ignore').addEventListener('click', async () => {
-    try {
-      const path = await App.PickDirectory()
-      if (!path) return
-      onEditIgnore(path)
-    } catch (err) {
-      toast(String(err?.message || err), 'error')
-    }
-  })
 
   $('#wc-recent-clear').addEventListener('click', async () => {
     const ok = await confirmDialog('确定清空所有最近打开记录？此操作不会删除任何仓库文件。', {

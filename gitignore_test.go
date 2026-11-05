@@ -234,3 +234,83 @@ func TestGitignoreAutoCreateAndRepoCheck(t *testing.T) {
 		t.Fatal("非仓库目录不应允许写入 .gitignore")
 	}
 }
+
+func childOf(list []IgnoreEntry, name string) (IgnoreEntry, bool) {
+	for _, e := range list {
+		if strings.EqualFold(e.Name, name) {
+			return e, true
+		}
+	}
+	return IgnoreEntry{}, false
+}
+
+func TestGitignoreChildrenAreLazyAndNestedRulesWork(t *testing.T) {
+	app, git, dir := newIgnoreTestRepo(t)
+	if err := os.MkdirAll(filepath.Join(dir, "logs", "archive"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, dir, "src/util/helper.go", "helper") // 未跟踪的深层文件
+	writeTestFile(t, dir, "build/bin/app.exe", "bin")     // 被 /build/ 忽略
+
+	// 1) 展开只返回一层子项，且状态来自 Git
+	kids, err := app.GetGitignoreChildren(dir, "src")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := childOf(kids, "src/main.go"); !ok || !e.Tracked || e.State != "tracked" {
+		t.Errorf("src/main.go 应为已跟踪文件：%+v / %v", e, ok)
+	}
+	if e, ok := childOf(kids, "src/util"); !ok || !e.IsDir || e.State != "untracked" {
+		t.Errorf("src/util 应为未跟踪目录：%+v / %v", e, ok)
+	}
+	if _, ok := childOf(kids, "src/util/helper.go"); ok {
+		t.Error("展开目录只应返回直接子项，不应递归展开")
+	}
+
+	// 2) 被忽略目录里的子项仍标记为「已忽略」
+	buildKids, err := app.GetGitignoreChildren(dir, "build")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := childOf(buildKids, "build/bin"); !ok || !e.IsDir || !e.Ignored {
+		t.Errorf("build/bin 应显示为已忽略目录：%+v / %v", e, ok)
+	}
+
+	// 3) 非法路径 / 非目录必须拒绝
+	for _, bad := range []string{"", "../evil", ".git", "not-exist", "src/main.go"} {
+		if _, err := app.GetGitignoreChildren(dir, bad); err == nil {
+			t.Errorf("应拒绝无效目录 %q", bad)
+		}
+	}
+
+	// 4) 已知深层路径要补齐中间目录，前端才能把文件挂到树节点上
+	//    （被忽略目录的内部文件不在此列，它们由展开时的按需加载提供）
+	ov, err := app.GetGitignoreOverview(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := entryOf(ov, "src/util"); !ok || !e.IsDir || e.State != "untracked" {
+		t.Errorf("overview 应补齐 src/util 且继承未跟踪状态：%+v / %v", e, ok)
+	}
+
+	// 5) 勾选展开后才出现的子路径要能写出精确规则；臆造路径仍要丢弃
+	res, err := app.SaveGitignore(dir,
+		[]string{"build", "debug.log", "src/util/helper.go", "logs/archive", "not-exist"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rule := range []string{"/build/", "*.log", "/src/util/helper.go", "/logs/archive/"} {
+		if !strings.Contains(res.Content, rule) {
+			t.Errorf("应写入/保留 %q，内容：%q", rule, res.Content)
+		}
+	}
+	if strings.Contains(res.Content, "not-exist") {
+		t.Errorf("不应写入不存在的路径：%q", res.Content)
+	}
+	if !isIgnoredByGit(t, git, dir, "src/util/helper.go") {
+		t.Error("嵌套文件规则未被 Git 识别")
+	}
+	if !isIgnoredByGit(t, git, dir, "logs/archive/") {
+		t.Error("空目录规则未被 Git 识别")
+	}
+}

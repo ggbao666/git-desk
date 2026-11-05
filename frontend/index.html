@@ -36,10 +36,6 @@
           </div>
         </div>
         <div class="head-actions">
-        <button id="wc-ignore" class="btn ghost compact" title="选择 Git 仓库（或仓库内任意目录）并编辑它的 .gitignore">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
-          忽略规则
-        </button>
         <button id="wc-settings" class="btn ghost compact" title="设置">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
           设置
@@ -324,7 +320,7 @@
           <input id="ignore-untrack" type="checkbox" checked />
           <span>已跟踪文件加入忽略时，也从 Git 索引移除（保留本地文件）</span>
         </label>
-        <p class="field-hint" title="仅管理精确规则；注释与 *.log 等自定义规则原样保留，移出被通配符忽略的文件会自动写入 ! 例外规则。">精确规则可增删；自定义通配符规则保留，移出时写 ! 例外规则。</p>
+        <p class="field-hint" title="目录默认折叠，点箭头按需读取一层子内容；仅管理精确规则，注释与 *.log 等自定义规则原样保留，移出被通配符忽略的文件会自动写入 ! 例外规则。">点箭头展开目录（默认折叠）；精确规则可增删，通配符规则保留。</p>
       </div>
       <div class="modal-foot">
         <button id="ignore-cancel" class="btn ghost">取消</button>

@@ -340,7 +340,6 @@ async function boot() {
   welcome.initWelcome({
     onOpenRepo: (path) => openFromPath(path),
     onSettings: openSettings,
-    onEditIgnore: (path) => gitignore.openGitignore(path),
   })
 
   const ready = await waitForWails()

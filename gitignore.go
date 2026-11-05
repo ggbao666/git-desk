@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	gitignoreName    = ".gitignore"
-	maxIgnoreEntries = 600
+	gitignoreName     = ".gitignore"
+	maxIgnoreEntries  = 600
+	maxIgnoreChildren = 400 // 单个目录一次最多展开的直接子项
 )
 
 // IgnoreEntry 是仓库中的一个文件或目录（路径相对仓库根）。
@@ -193,6 +194,17 @@ func collectIgnoreCandidates(repo *repoCtx) (map[string]*ignoreCandidate, bool) 
 		if isDir {
 			c.isDir = true
 		}
+		// 补齐每一级父目录：前端按路径建树时，深层文件必须能挂到对应的目录节点上
+		parts := strings.Split(name, "/")
+		for i := 1; i < len(parts); i++ {
+			parent := strings.Join(parts[:i], "/")
+			pkey := strings.ToLower(parent)
+			if pc := candidates[pkey]; pc == nil {
+				candidates[pkey] = &ignoreCandidate{name: parent, isDir: true}
+			} else {
+				pc.isDir = true
+			}
+		}
 		return c
 	}
 	markTop := func(p string, untracked bool) {
@@ -272,6 +284,28 @@ func collectIgnoreCandidates(repo *repoCtx) (map[string]*ignoreCandidate, bool) 
 		trimmed := strings.TrimSpace(body)
 		if c := add(strings.Trim(trimmed, "/"), strings.HasSuffix(trimmed, "/")); c != nil {
 			_ = c
+		}
+	}
+
+	// 目录状态由子树决定：从深到浅把「已跟踪 / 未跟踪 / 有改动」向上归并，
+	// 这样 src/、build/bin/ 这类节点不会错误地显示成「仅规则」。
+	keys := make([]string, 0, len(candidates))
+	for key := range candidates {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return strings.Count(candidates[keys[i]].name, "/") > strings.Count(candidates[keys[j]].name, "/")
+	})
+	for _, key := range keys {
+		c := candidates[key]
+		idx := strings.LastIndexByte(c.name, '/')
+		if idx < 0 {
+			continue
+		}
+		if parent := candidates[strings.ToLower(c.name[:idx])]; parent != nil {
+			parent.tracked = parent.tracked || c.tracked
+			parent.untracked = parent.untracked || c.untracked
+			parent.modified = parent.modified || c.modified
 		}
 	}
 	return candidates, exists
@@ -357,6 +391,150 @@ func (a *App) GetGitignoreOverview(dir string) (IgnoreOverview, error) {
 	}, nil
 }
 
+// GetGitignoreChildren 返回 parent（相对仓库根）下的直接子项，供编辑器展开目录时按需加载。
+// 只看一层，避免 node_modules 之类的巨量文件拖慢界面；状态仍由 git 判定。
+func (a *App) GetGitignoreChildren(dir string, parent string) ([]IgnoreEntry, error) {
+	repo, err := a.ignoreRepo(dir)
+	if err != nil {
+		return nil, err
+	}
+	name, ok := safeIgnoreName(parent)
+	if !ok {
+		return nil, fmt.Errorf("目录路径无效：%s", parent)
+	}
+	abs := filepath.Join(repo.root, filepath.FromSlash(name))
+	if rel, relErr := filepath.Rel(repo.root, abs); relErr != nil || strings.HasPrefix(rel, "..") {
+		return nil, fmt.Errorf("目录路径无效：%s", parent)
+	}
+	info, statErr := os.Stat(abs)
+	if statErr != nil || !info.IsDir() {
+		return nil, fmt.Errorf("目录不存在：%s", parent)
+	}
+	items, readErr := os.ReadDir(abs)
+	if readErr != nil {
+		return nil, fmt.Errorf("无法读取目录：%s", readErr)
+	}
+
+	prefix := name + "/"
+	candidates := make(map[string]*ignoreCandidate, len(items))
+	for _, it := range items {
+		child := it.Name()
+		if child == ".git" {
+			continue
+		}
+		full := prefix + child
+		if _, valid := safeIgnoreName(full); !valid {
+			continue
+		}
+		candidates[strings.ToLower(full)] = &ignoreCandidate{name: full, isDir: it.IsDir()}
+	}
+	if len(candidates) == 0 {
+		return []IgnoreEntry{}, nil
+	}
+
+	jobs := runParallel(
+		func() cmdResult {
+			return capture(repo.git.Path, []string{"ls-files", "-z", "--", prefix}, repo.root, statusTimeout)
+		},
+		func() cmdResult {
+			return capture(repo.git.Path,
+				[]string{"status", "--porcelain", "-z", "--untracked-files=all", "--", prefix},
+				repo.root, statusTimeout)
+		},
+	)
+	// 深层路径的状态归到它在 parent 下的第一级节点上
+	mark := func(raw, field string) {
+		p := filepath.ToSlash(raw)
+		if !strings.HasPrefix(p, prefix) {
+			return
+		}
+		first := strings.SplitN(strings.TrimPrefix(p, prefix), "/", 2)[0]
+		if first == "" {
+			return
+		}
+		c := candidates[strings.ToLower(prefix+first)]
+		if c == nil {
+			return
+		}
+		switch field {
+		case "tracked":
+			c.tracked = true
+		case "modified":
+			c.modified, c.tracked = true, true
+		case "untracked":
+			c.untracked = true
+		}
+	}
+	for _, p := range nulItems(jobs[0].Stdout) {
+		mark(p, "tracked")
+	}
+	for _, f := range parseStatusEntries(jobs[1].Stdout) {
+		if f.Index == "?" && f.Worktree == "?" {
+			mark(f.Path, "untracked")
+		} else {
+			mark(f.Path, "modified")
+		}
+	}
+
+	entries := buildIgnoreEntries(repo, candidates)
+	if len(entries) > maxIgnoreChildren {
+		entries = entries[:maxIgnoreChildren]
+	}
+	return entries, nil
+}
+
+// addCheckedChildren 把「展开目录后才出现、且磁盘上确实存在」的路径补进候选集，
+// 这样勾选子树里的文件也能写出 /build/bin/out.js 这样的精确规则。
+// 不存在的路径一律丢弃，避免把臆造的名字写进 .gitignore。
+func addCheckedChildren(repo *repoCtx, candidates map[string]*ignoreCandidate, checked []string) {
+	var missing []string
+	seen := make(map[string]bool)
+	for _, raw := range checked {
+		name, ok := safeIgnoreName(raw)
+		if !ok {
+			continue
+		}
+		key := normalizeIgnoreRule(name)
+		if candidates[key] != nil || seen[key] {
+			continue
+		}
+		seen[key] = true
+		if _, err := os.Stat(filepath.Join(repo.root, filepath.FromSlash(name))); err != nil {
+			continue
+		}
+		missing = append(missing, name)
+	}
+	if len(missing) == 0 {
+		return
+	}
+
+	tracked := make(map[string]bool)
+	for _, p := range nulItems(capture(repo.git.Path, []string{"ls-files", "-z"}, repo.root, statusTimeout).Stdout) {
+		tracked[strings.ToLower(p)] = true
+	}
+	hasTracked := func(name string) bool {
+		key := strings.ToLower(name)
+		if tracked[key] {
+			return true
+		}
+		prefix := key + "/"
+		for p := range tracked {
+			if strings.HasPrefix(p, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, name := range missing {
+		info, err := os.Stat(filepath.Join(repo.root, filepath.FromSlash(name)))
+		candidates[normalizeIgnoreRule(name)] = &ignoreCandidate{
+			name:    name,
+			isDir:   err == nil && info.IsDir(),
+			tracked: hasTracked(name),
+		}
+	}
+}
+
 // managedIgnoreRule 判断一行是否是「针对某个候选条目的精确规则」。
 // 注释、通配符、否定规则之外的内容一律视为用户自定义规则原样保留。
 func managedIgnoreRule(line string, candidates map[string]*ignoreCandidate) (string, bool, bool) {
@@ -401,7 +579,11 @@ func (a *App) SaveGitignore(dir string, checked []string, untrackTracked bool) (
 	}
 	root := repo.root
 	candidates, exists := collectIgnoreCandidates(repo)
+	// 树形展开后才出现的子路径，同样要能写出 /build/bin/out.js 这样的精确规则
+	addCheckedChildren(repo, candidates, checked)
 	beforeIgnored := checkIgnoredKeys(repo, candidates)
+	untracked := []string{}
+	warnings := []string{}
 
 	want := make(map[string]bool, len(checked))
 	for _, name := range checked {
@@ -475,10 +657,17 @@ func (a *App) SaveGitignore(dir string, checked []string, untrackTracked bool) (
 		if err != nil {
 			return IgnoreSaveResult{}, err
 		}
+		// Git 不会重新包含「父目录仍被忽略」的子路径，明确提示用户一并取消父目录
+		stillIgnored := checkIgnoredKeys(repo, candidates)
+		for _, line := range negations {
+			key := normalizeIgnoreRule(strings.TrimPrefix(line, "!"))
+			if c := candidates[key]; c != nil && stillIgnored[key] {
+				warnings = append(warnings,
+					fmt.Sprintf("%s 仍被忽略：父目录也在忽略列表里，需要一并取消父目录的勾选", c.name))
+			}
+		}
 	}
 
-	untracked := []string{}
-	warnings := []string{}
 	if untrackTracked {
 		for _, key := range wantKeys {
 			if beforeIgnored[key] {
@@ -494,7 +683,8 @@ func (a *App) SaveGitignore(dir string, checked []string, untrackTracked bool) (
 			if r.Code == 0 {
 				untracked = append(untracked, c.name)
 			} else {
-				warnings = append(warnings, fmt.Sprintf("%s：%s", c.name, firstLine(joinOutput(r.Stderr, r.Stdout))))
+				warnings = append(warnings,
+					fmt.Sprintf("未能取消跟踪 %s：%s", c.name, firstLine(joinOutput(r.Stderr, r.Stdout))))
 			}
 		}
 	}

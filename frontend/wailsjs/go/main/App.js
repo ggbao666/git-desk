@@ -14,6 +14,10 @@ export function GetCurrentDir() {
   return window['go']['main']['App']['GetCurrentDir']();
 }
 
+export function GetGitignoreChildren(arg1, arg2) {
+  return window['go']['main']['App']['GetGitignoreChildren'](arg1, arg2);
+}
+
 export function GetGitignoreOverview(arg1) {
   return window['go']['main']['App']['GetGitignoreOverview'](arg1);
 }

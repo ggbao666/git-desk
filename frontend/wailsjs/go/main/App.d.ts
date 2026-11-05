@@ -8,6 +8,8 @@ export function CopyToClipboard(arg1:string):Promise<void>;
 
 export function GetCurrentDir():Promise<string>;
 
+export function GetGitignoreChildren(arg1:string,arg2:string):Promise<Array<main.IgnoreEntry>>;
+
 export function GetGitignoreOverview(arg1:string):Promise<main.IgnoreOverview>;
 
 export function GetRecentDirs():Promise<Array<main.RecentItem>>;
