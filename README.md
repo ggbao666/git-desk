@@ -37,7 +37,7 @@
 
 ## 直接运行
 
-从 [Releases](https://github.com/ggbao666/git-desk/releases) 下载 `GitDesk.exe` 双击即可。
+从 [Releases](https://github.com/ggbao666/git-desk/releases) 下载 `GitDesk.exe` 双击即可。每次推送到 `main` 都会更新固定的 [latest Release](https://github.com/ggbao666/git-desk/releases/tag/latest)，可以用这个链接一直拿到最新构建；正式版本请下载 `v*` 标签的 Release。
 
 启动页是紧凑的小窗口（440 × 620），选择仓库后窗口自动放大为工作台（1120 × 760），点返回又会缩回小窗口。
 
@@ -114,6 +114,7 @@ scripts/generate_icon.py   应用图标设计与生成脚本
 - **流程**：setup-go（读 `go.mod` 的 Go 版本）+ setup-node 22（npm 缓存）→ `npm ci` → 安装 Wails CLI → `wails build`（按 `wails.json` 内部执行 `npm run build` 并生成绑定；`CGO_ENABLED=0`，纯 Go 编译，不需要 gcc）
 - **产物**：每次运行上传 Artifact `GitDesk-Windows-x64`
 - **发版**：推送 `v*` 标签时自动创建 GitHub Release 并附上 `GitDesk.exe`（重跑同一标签会改为覆盖上传，不会失败）
+- **滚动构建**：每次 push 到 `main` 额外更新固定标签 `latest` 的 Release，覆盖上传最新 exe，便于用固定链接下载开发版
 
 手动发布一个版本：
 

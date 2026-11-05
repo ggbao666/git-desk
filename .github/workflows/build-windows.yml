@@ -5,7 +5,6 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -85,3 +84,20 @@ jobs:
             gh release create $tag $exe --generate-notes --title "GitDesk $tag" --repo $repo
           }
           if ($LASTEXITCODE -ne 0) { throw "发布 Release 失败" }
+
+      # 推送到 main：维护固定的 latest Release，始终提供最新构建的下载地址
+      - name: Publish latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $repo = "${{ github.repository }}"
+          $exe = 'build/bin/GitDesk.exe'
+          $ver = (Get-Content wails.json -Raw | ConvertFrom-Json).info.productVersion
+          gh release view latest --repo $repo 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create latest --repo $repo --title "GitDesk v$ver（最新构建）" --notes "由 ${{ github.sha }} 自动构建，仅 Windows x64。"
+          }
+          gh release upload latest $exe --clobber --repo $repo
+          if ($LASTEXITCODE -ne 0) { throw "更新 latest Release 失败" }
