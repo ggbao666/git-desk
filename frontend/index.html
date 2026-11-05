@@ -35,19 +35,24 @@
             <p>轻量 Git 仓库工作台</p>
           </div>
         </div>
+        <div class="head-actions">
+        <button id="wc-ignore" class="btn ghost compact" title="选择目录并编辑它的 .gitignore">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+          忽略规则
+        </button>
         <button id="wc-settings" class="btn ghost compact" title="设置">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
           设置
         </button>
+        </div>
       </header>
 
       <div class="welcome-open">
-        <div id="drop-zone" class="drop-zone">
-          <div class="drop-icon">
+        <div id="drop-zone" class="drop-zone" title="把文件夹拖到这里；拖入仓库内任意文件也会自动定位仓库根目录">
+          <span class="drop-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-          </div>
-          <div class="drop-title">把文件夹拖到这里</div>
-          <div class="drop-sub">仓库内任意文件也可以，自动定位根目录</div>
+          </span>
+          <span class="drop-title">把文件夹拖到这里</span>
         </div>
         <button id="wc-pick" class="btn primary pick-btn" title="选择仓库目录">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
@@ -69,12 +74,15 @@
         <div class="recent-foot">记录保存在本机，最多保留 12 个仓库</div>
       </div>
 
-      <div id="wc-git-info" class="git-info"><span class="dot"></span><span class="git-info-text">正在检测 Git…</span></div>
+      <div id="wc-git-info" class="git-info">
+        <div class="git-info-row"><span class="dot"></span><span class="git-info-text">正在检测 Git…</span></div>
+        <div class="git-info-row sub"><span class="git-info-text"></span></div>
+      </div>
     </div>
   </section>
 
   <!-- ==================== 工作台 ==================== -->
-  <section id="workspace" class="workspace hidden">
+  <section id="workspace" class="workspace" hidden>
     <header class="topbar">
       <div class="topbar-left">
         <button id="ws-back" class="icon-btn" title="返回目录选择">
@@ -95,6 +103,9 @@
         </button>
         <button id="ws-theme" class="icon-btn" title="切换明暗主题">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <button id="ws-ignore" class="icon-btn" title="编辑 .gitignore">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
         </button>
         <button id="ws-settings" class="icon-btn" title="设置">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
@@ -144,7 +155,7 @@
           <span id="sync-note" class="sync-note"></span>
         </div>
 
-        <div id="conflict-box" class="conflict-box hidden">
+        <div id="conflict-box" class="conflict-box" hidden>
           <div class="conflict-head">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
             <span>存在 <b id="conflict-count">0</b> 个冲突文件</span>
@@ -166,13 +177,13 @@
       </div>
 
       <!-- 改动 -->
-      <div class="panel hidden" data-panel="changes">
+      <div class="panel" hidden data-panel="changes">
         <div class="panel-head">
           <label class="check-label"><input type="checkbox" id="select-all" /><span>改动文件</span></label>
           <span id="changes-count" class="muted"></span>
         </div>
         <div id="changes-tree" class="tree"></div>
-        <p id="changes-empty" class="empty hidden">工作区没有改动。</p>
+        <p id="changes-empty" class="empty" hidden>工作区没有改动。</p>
         <div class="commit-box">
           <label for="commit-message" class="field-label">提交说明</label>
           <div class="commit-row">
@@ -184,7 +195,7 @@
       </div>
 
       <!-- 分支 -->
-      <div class="panel hidden" data-panel="branches">
+      <div class="panel" hidden data-panel="branches">
         <div class="panel-head">
           <span class="panel-title">本地分支</span>
           <span id="branch-count" class="muted"></span>
@@ -195,7 +206,7 @@
           <button id="act-branch-new" class="btn ghost">新建分支</button>
           <button id="act-branch-delete" class="btn ghost danger">删除分支</button>
         </div>
-        <div id="branch-create" class="branch-create hidden">
+        <div id="branch-create" class="branch-create" hidden>
           <input id="branch-name" type="text" placeholder="新分支名称，例如 feature/note-export" spellcheck="false" />
           <button id="act-branch-confirm" class="btn primary">创建并切换</button>
           <button id="act-branch-cancel" class="btn ghost">取消</button>
@@ -204,19 +215,19 @@
       </div>
 
       <!-- 历史 -->
-      <div class="panel hidden" data-panel="history">
+      <div class="panel" hidden data-panel="history">
         <div class="panel-head">
           <span class="panel-title">提交历史</span>
           <span id="history-count" class="muted"></span>
         </div>
         <div id="history-list" class="history-list"></div>
-        <p id="history-empty" class="empty hidden">还没有提交记录。</p>
-        <button id="act-history-more" class="btn ghost history-more hidden">加载更多</button>
+        <p id="history-empty" class="empty" hidden>还没有提交记录。</p>
+        <button id="act-history-more" class="btn ghost history-more" hidden>加载更多</button>
       </div>
     </main>
 
     <footer class="bottombar">
-      <pre id="log" class="log hidden"></pre>
+      <pre id="log" class="log" hidden></pre>
       <div class="bottom-row">
         <span id="status-line" class="status-line">就绪</span>
         <span class="spacer"></span>
@@ -226,7 +237,7 @@
   </section>
 
   <!-- ==================== 设置 ==================== -->
-  <div id="settings-modal" class="modal-mask hidden">
+  <div id="settings-modal" class="modal-mask" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-label="设置">
       <div class="modal-head"><h2>设置</h2><button id="settings-close" class="icon-btn" aria-label="关闭">×</button></div>
       <div class="modal-body">
@@ -270,7 +281,7 @@
   </div>
 
   <!-- ==================== 确认框 ==================== -->
-  <div id="confirm-modal" class="modal-mask hidden">
+  <div id="confirm-modal" class="modal-mask" hidden>
     <div class="modal modal-sm" role="dialog" aria-modal="true">
       <div class="modal-head"><h2 id="confirm-title">请确认</h2></div>
       <div class="modal-body"><p id="confirm-message" class="confirm-message"></p></div>
@@ -281,10 +292,34 @@
     </div>
   </div>
 
+  <!-- ==================== .gitignore 编辑器 ==================== -->
+  <div id="ignore-modal" class="modal-mask" hidden>
+    <div class="modal ignore-modal" role="dialog" aria-modal="true" aria-label="编辑 .gitignore">
+      <div class="modal-head"><h2>编辑 .gitignore</h2><button id="ignore-close" class="icon-btn" aria-label="关闭">×</button></div>
+      <div class="modal-body">
+        <div id="ignore-dir" class="ignore-dir" title=""></div>
+        <div id="ignore-state" class="ignore-state"></div>
+        <div class="ignore-toolbar">
+          <span>目录内容（勾选 = 忽略）</span>
+          <span class="ignore-tools">
+            <button id="ignore-select-all" class="text-btn">全选</button>
+            <button id="ignore-select-none" class="text-btn">全不选</button>
+          </span>
+        </div>
+        <div id="ignore-list" class="ignore-list"></div>
+        <p class="field-hint">仅管理当前目录一层的精确规则；注释和 *.log 之类的自定义规则会原样保留。</p>
+      </div>
+      <div class="modal-foot">
+        <button id="ignore-cancel" class="btn ghost">取消</button>
+        <button id="ignore-save" class="btn primary">保存</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-host" class="toast-host"></div>
 
   <!-- 全窗口拖拽提示遮罩 -->
-  <div id="drop-overlay" class="drop-overlay hidden">
+  <div id="drop-overlay" class="drop-overlay" hidden>
     <div class="drop-overlay-inner">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
       <strong>松开以打开仓库</strong>

@@ -3,6 +3,7 @@ import { App, rt, onEvent } from './api.js'
 import { $, toast, confirmDialog, initUI } from './ui.js'
 import * as welcome from './welcome.js'
 import * as gitview from './gitview.js'
+import * as gitignore from './gitignore.js'
 
 let settings = { gitPath: '', theme: 'dark' }
 let pendingInitDir = ''
@@ -12,7 +13,7 @@ let lastDropAt = 0
 
 // 启动页使用紧凑小窗口，进入工作台后放大
 const WINDOW_SIZE = {
-  welcome:   { w: 440, h: 620, minW: 400, minH: 520 },
+  welcome:   { w: 440, h: 420, minW: 400, minH: 380 },
   workspace: { w: 1120, h: 760, minW: 880, minH: 580 },
 }
 
@@ -270,6 +271,7 @@ function initDragAndDrop() {
 function initShortcuts() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (gitignore.isGitignoreOpen()) { gitignore.closeGitignore(); return }
       if (!$('#settings-modal').hidden) { closeSettings(); return }
       if (!$('#workspace').hidden && !gitview.hasBusy()) {
         $('#branch-create').hidden = true
@@ -305,7 +307,19 @@ async function boot() {
   initSettings()
   initShortcuts()
   gitview.initGitView()
+  gitignore.initGitignore({
+    onSaved: (dir) => {
+      const root = gitview.getRoot()
+      if (root && !$('#workspace').hidden && root.toLowerCase() === String(dir).toLowerCase()) {
+        void gitview.refreshStatus()
+      }
+    },
+  })
 
+  $('#ws-ignore').addEventListener('click', () => {
+    const dir = gitview.getRoot()
+    if (dir) void gitignore.openGitignore(dir)
+  })
   $('#ws-back').addEventListener('click', () => {
     gitview.closeRepo()
     showWelcome()
@@ -326,6 +340,7 @@ async function boot() {
   welcome.initWelcome({
     onOpenRepo: (path) => openFromPath(path),
     onSettings: openSettings,
+    onEditIgnore: (path) => gitignore.openGitignore(path),
   })
 
   const ready = await waitForWails()

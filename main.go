@@ -33,8 +33,8 @@ func main() {
 
 	// 启动页用紧凑小窗口；若通过命令行参数直接打开仓库，初始就是工作台大窗口。
 	// 视图切换时前端会再调用 WindowSetSize / WindowSetMinSize 调整。
-	width, height := 440, 620
-	minWidth, minHeight := 400, 520
+	width, height := 440, 420
+	minWidth, minHeight := 400, 380
 	if startupDir != "" {
 		width, height, minWidth, minHeight = 1120, 760, 880, 580
 	}

@@ -35,11 +35,18 @@
 - 明暗主题、在资源管理器中显示、操作日志、Toast 提示
 - 快捷键：`F5` 刷新状态，`Ctrl+O` 返回启动页，`Esc` 关闭弹窗
 
+## 编辑 .gitignore
+
+- **入口**：启动页点「忽略规则」可先选择任意目录（不要求是 Git 仓库）；工作台顶栏的文档图标直接编辑当前仓库。
+- **操作**：弹窗列出该目录一层的全部文件和文件夹，勾选即写入忽略规则，取消勾选即删除对应规则；目录不存在 `.gitignore` 时保存会自动创建。
+- **安全**：已有的注释、`*.log` 等通配符和 `!` 否定规则原样保留，只增删与文件名精确对应的规则；后端只接受目录中真实存在的名字，不能写入任意路径。
+- 保存时若编辑的是当前打开的仓库，会自动刷新工作区改动列表。
+
 ## 直接运行
 
 从 [Releases](https://github.com/ggbao666/git-desk/releases) 下载 `GitDesk.exe` 双击即可。每次推送到 `main` 都会更新固定的 [latest Release](https://github.com/ggbao666/git-desk/releases/tag/latest)，可以用这个链接一直拿到最新构建；正式版本请下载 `v*` 标签的 Release。
 
-启动页是紧凑的小窗口（440 × 620），选择仓库后窗口自动放大为工作台（1120 × 760），点返回又会缩回小窗口。
+启动页是紧凑的小窗口（440 × 420），选择仓库后窗口自动放大为工作台（1120 × 760），点返回又会缩回小窗口。
 
 运行前置条件：
 
@@ -98,6 +105,9 @@ git_ops.go           status / pull / push / commit / 冲突 / 分支 / 历史
 git_types.go         与前端约定的数据结构
 recent.go            最近打开记录（最多 12 条）
 settings.go          设置持久化
+gitignore.go         .gitignore 规则读取与增删（保留自定义规则、自动创建）
+gitignore_test.go    规则增删与自动创建的单元测试
+frontend/src/gitignore.js  .gitignore 编辑弹窗
 frontend/index.html  界面结构
 frontend/src/        启动页、工作台、样式、API 封装
 frontend/wailsjs/    Wails 自动生成的绑定（已入库，clone 后可直接开发）

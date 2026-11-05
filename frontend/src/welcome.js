@@ -3,10 +3,12 @@ import { $, el, basename, formatTime, toast, confirmDialog } from './ui.js'
 
 let onOpenRepo = () => {}
 let onSettings = () => {}
+let onEditIgnore = () => {}
 
 export function initWelcome(handlers = {}) {
   onOpenRepo = handlers.onOpenRepo || onOpenRepo
   onSettings = handlers.onSettings || onSettings
+  onEditIgnore = handlers.onEditIgnore || onEditIgnore
 
   $('#wc-pick').addEventListener('click', async () => {
     try {
@@ -19,6 +21,17 @@ export function initWelcome(handlers = {}) {
   })
 
   $('#wc-settings').addEventListener('click', onSettings)
+
+  // 启动页也能编辑任意目录的 .gitignore（不要求该目录是 Git 仓库）
+  $('#wc-ignore').addEventListener('click', async () => {
+    try {
+      const path = await App.PickDirectory()
+      if (!path) return
+      onEditIgnore(path)
+    } catch (err) {
+      toast(String(err?.message || err), 'error')
+    }
+  })
 
   $('#wc-recent-clear').addEventListener('click', async () => {
     const ok = await confirmDialog('确定清空所有最近打开记录？此操作不会删除任何仓库文件。', {
@@ -52,12 +65,17 @@ export function setDropActive(active) {
   $('#drop-zone')?.classList.toggle('is-over', active)
 }
 
-function setGitInfo(node, state, text, title) {
+function setGitInfo(node, state, first, second, title) {
   node.className = `git-info ${state}`
   node.innerHTML = ''
-  node.appendChild(el('span', { class: 'dot' }))
-  node.appendChild(el('span', { class: 'git-info-text', text }))
-  node.title = title || text
+  node.appendChild(el('div', { class: 'git-info-row' }, [
+    el('span', { class: 'dot' }),
+    el('span', { class: 'git-info-text', text: first }),
+  ]))
+  node.appendChild(el('div', { class: 'git-info-row sub' }, [
+    el('span', { class: 'git-info-text', text: second }),
+  ]))
+  node.title = title || `${first}\n${second}`
 }
 
 export async function refreshGitInfo() {
@@ -66,13 +84,13 @@ export async function refreshGitInfo() {
   try {
     const r = await App.GitDetect(false)
     if (r?.ok) {
-      setGitInfo(info, 'ok', `${r.version} · ${r.path}`,
+      setGitInfo(info, 'ok', r.version, r.path,
         `${r.version}\n${r.path}\n来源：${r.source === 'auto' ? '自动探测' : '手动指定'}`)
     } else {
-      setGitInfo(info, 'bad', r?.error || '未检测到 Git')
+      setGitInfo(info, 'bad', r?.error || '未检测到 Git', '可在「设置」中手动指定 Git 路径')
     }
   } catch (err) {
-    setGitInfo(info, 'bad', 'Git 检测失败：' + String(err?.message || err))
+    setGitInfo(info, 'bad', 'Git 检测失败：' + String(err?.message || err), '请在打包后的程序中运行，或通过「设置」指定 Git 路径')
   }
 }
 
