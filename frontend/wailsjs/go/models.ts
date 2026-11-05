@@ -314,6 +314,8 @@ export namespace main {
 	    name: string;
 	    isDir: boolean;
 	    ignored: boolean;
+	    state: string;
+	    tracked: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new IgnoreEntry(source);
@@ -324,12 +326,16 @@ export namespace main {
 	        this.name = source["name"];
 	        this.isDir = source["isDir"];
 	        this.ignored = source["ignored"];
+	        this.state = source["state"];
+	        this.tracked = source["tracked"];
 	    }
 	}
 	export class IgnoreOverview {
 	    dir: string;
+	    root: string;
 	    exists: boolean;
 	    entries: IgnoreEntry[];
+	    truncated: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new IgnoreOverview(source);
@@ -338,8 +344,10 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.dir = source["dir"];
+	        this.root = source["root"];
 	        this.exists = source["exists"];
 	        this.entries = this.convertValues(source["entries"], IgnoreEntry);
+	        this.truncated = source["truncated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -364,6 +372,10 @@ export namespace main {
 	    ok: boolean;
 	    created: boolean;
 	    content: string;
+	    added: number;
+	    removed: number;
+	    untracked: string[];
+	    warnings: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new IgnoreSaveResult(source);
@@ -374,6 +386,10 @@ export namespace main {
 	        this.ok = source["ok"];
 	        this.created = source["created"];
 	        this.content = source["content"];
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	        this.untracked = source["untracked"];
+	        this.warnings = source["warnings"];
 	    }
 	}
 	export class RecentItem {

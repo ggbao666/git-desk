@@ -102,8 +102,8 @@ export function RevealInExplorer(arg1) {
   return window['go']['main']['App']['RevealInExplorer'](arg1);
 }
 
-export function SaveGitignore(arg1, arg2) {
-  return window['go']['main']['App']['SaveGitignore'](arg1, arg2);
+export function SaveGitignore(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveGitignore'](arg1, arg2, arg3);
 }
 
 export function SaveSettings(arg1) {

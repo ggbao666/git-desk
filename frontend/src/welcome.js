@@ -22,7 +22,7 @@ export function initWelcome(handlers = {}) {
 
   $('#wc-settings').addEventListener('click', onSettings)
 
-  // 启动页也能编辑任意目录的 .gitignore（不要求该目录是 Git 仓库）
+  // 启动页也能选仓库编辑 .gitignore（后端会自动定位到仓库根并校验）
   $('#wc-ignore').addEventListener('click', async () => {
     try {
       const path = await App.PickDirectory()

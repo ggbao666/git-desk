@@ -7,95 +7,230 @@ import (
 	"testing"
 )
 
-func TestGitignoreEditor(t *testing.T) {
+// ---------------------------------------------------------------------------
+// .gitignore 编辑器：基于真实 Git 仓库的集成测试
+// ---------------------------------------------------------------------------
+
+func writeTestFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	p := filepath.Join(dir, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// newIgnoreTestRepo 建一个包含已跟踪 / 未跟踪 / 通配符忽略 / 目录忽略的仓库。
+func newIgnoreTestRepo(t *testing.T) (*App, *gitRunner, string) {
+	t.Helper()
+	git := testGitRunner(t)
 	dir := t.TempDir()
-	must := func(name string, isDir bool) {
-		t.Helper()
-		p := filepath.Join(dir, name)
-		if isDir {
-			if err := os.MkdirAll(p, 0755); err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-		if err := os.WriteFile(p, []byte("x"), 0644); err != nil {
-			t.Fatal(err)
+	mustGit(t, git, dir, "init", "-q")
+	mustGit(t, git, dir, "config", "user.name", "GitDesk Test")
+	mustGit(t, git, dir, "config", "user.email", "test@gitdesk.local")
+
+	writeTestFile(t, dir, ".gitignore", "# 自定义注释\n*.log\n/build/\n")
+	writeTestFile(t, dir, "tracked.txt", "tracked")
+	writeTestFile(t, dir, "src/main.go", "package main")
+	mustGit(t, git, dir, "add", ".")
+	mustGit(t, git, dir, "commit", "-q", "-m", "init")
+
+	writeTestFile(t, dir, "new.txt", "new")         // 未跟踪
+	writeTestFile(t, dir, "cache/x.tmp", "tmp")     // 未跟踪目录
+	writeTestFile(t, dir, "debug.log", "log")       // 被 *.log 忽略
+	writeTestFile(t, dir, "build/out.js", "bundle") // 被 /build/ 忽略
+	return &App{}, git, dir
+}
+
+func isIgnoredByGit(t *testing.T, git *gitRunner, dir, path string) bool {
+	t.Helper()
+	r := capture(git.Path, []string{"check-ignore", "--no-index", path}, dir, statusTimeout)
+	return r.Code == 0
+}
+
+func entryOf(ov IgnoreOverview, name string) (IgnoreEntry, bool) {
+	for _, e := range ov.Entries {
+		if strings.EqualFold(e.Name, name) {
+			return e, true
 		}
 	}
-	must("src", true)
-	must("node_modules", true)
-	must("README.md", false)
-	must(".env", false)
-	must(".git", true)
+	return IgnoreEntry{}, false
+}
 
+func TestGitignoreOverviewUsesRepoState(t *testing.T) {
+	app, git, dir := newIgnoreTestRepo(t)
+	ov, err := app.GetGitignoreOverview(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ov.Exists || ov.Root != dir {
+		t.Fatalf("仓库定位或 .gitignore 识别错误：%+v", ov)
+	}
+
+	cases := []struct {
+		name, state string
+		ignored     bool
+		tracked     bool
+	}{
+		{"new.txt", "untracked", false, false},
+		{"cache", "untracked", false, false},
+		{"debug.log", "ignored", true, false},
+		{"build", "ignored", true, false},
+		{"tracked.txt", "tracked", false, true},
+		{"src/main.go", "tracked", false, true},
+	}
+	for _, c := range cases {
+		e, ok := entryOf(ov, c.name)
+		if !ok {
+			t.Errorf("缺少条目 %s，实际条目：%+v", c.name, ov.Entries)
+			continue
+		}
+		if e.State != c.state || e.Ignored != c.ignored || e.Tracked != c.tracked {
+			t.Errorf("%s 状态错误：%+v，期望 state=%s ignored=%v tracked=%v",
+				c.name, e, c.state, c.ignored, c.tracked)
+		}
+	}
+	if _, ok := entryOf(ov, ".gitignore"); ok {
+		t.Error(".gitignore 自身不应出现在列表里")
+	}
+	if !isIgnoredByGit(t, git, dir, "debug.log") {
+		t.Fatal("测试前置条件失败：debug.log 应被 *.log 忽略")
+	}
+}
+
+func TestGitignoreAddUntrackedAndTracked(t *testing.T) {
+	app, git, dir := newIgnoreTestRepo(t)
+
+	// checked 是「所有要忽略的条目」全量快照；非法路径应被后端丢弃
+	res, err := app.SaveGitignore(dir,
+		[]string{"build", "debug.log", "new.txt", "tracked.txt", "../evil", "not-exist"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.OK || res.Created {
+		t.Fatalf("应更新已存在的 .gitignore：%+v", res)
+	}
+	for _, keep := range []string{"# 自定义注释", "*.log", "/build/", "/new.txt", "/tracked.txt"} {
+		if !strings.Contains(res.Content, keep) {
+			t.Errorf("应保留/写入 %q，内容：%q", keep, res.Content)
+		}
+	}
+	if strings.Contains(res.Content, "evil") || strings.Contains(res.Content, "not-exist") {
+		t.Fatalf("不应写入非法路径：%q", res.Content)
+	}
+	if !isIgnoredByGit(t, git, dir, "new.txt") || !isIgnoredByGit(t, git, dir, "tracked.txt") {
+		t.Fatal("新规则未被 Git 识别")
+	}
+	if len(res.Untracked) != 1 || res.Untracked[0] != "tracked.txt" {
+		t.Fatalf("已跟踪文件应从索引移除：%+v", res.Untracked)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "tracked.txt")); err != nil {
+		t.Fatal("git rm --cached 不应删除磁盘文件")
+	}
+	indexed := capture(git.Path, []string{"ls-files"}, dir, statusTimeout)
+	if strings.Contains(indexed.Stdout, "tracked.txt") {
+		t.Fatalf("tracked.txt 仍在索引中：%s", indexed.Stdout)
+	}
+
+	ov, err := app.GetGitignoreOverview(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"new.txt", "tracked.txt"} {
+		e, ok := entryOf(ov, name)
+		if !ok || !e.Ignored || e.State != "ignored" {
+			t.Errorf("%s 应显示为已忽略：%+v", name, e)
+		}
+	}
+}
+
+func TestGitignoreRemoveFromWildcardRule(t *testing.T) {
+	app, git, dir := newIgnoreTestRepo(t)
+
+	// 保持 build/ 忽略，把被 *.log 通配符忽略的 debug.log 移出
+	res, err := app.SaveGitignore(dir, []string{"build"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Content, "*.log") {
+		t.Fatalf("用户自定义通配符规则不得丢失：%q", res.Content)
+	}
+	if !strings.Contains(res.Content, "!/debug.log") {
+		t.Fatalf("移出被通配符忽略的文件应写入否定规则：%q", res.Content)
+	}
+	if isIgnoredByGit(t, git, dir, "debug.log") {
+		t.Fatal("debug.log 应已移出忽略")
+	}
+	if !isIgnoredByGit(t, git, dir, "build/") {
+		t.Fatal("build/ 应保持忽略")
+	}
+
+	// 再次勾选 debug.log：否定规则要被移除，且不重复写精确规则
+	res2, err := app.SaveGitignore(dir, []string{"build", "debug.log"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(res2.Content, "!") {
+		t.Fatalf("重新加入后不应残留否定规则：%q", res2.Content)
+	}
+	if !isIgnoredByGit(t, git, dir, "debug.log") {
+		t.Fatal("debug.log 应重新被 *.log 忽略")
+	}
+}
+
+func TestGitignoreRemoveExactRule(t *testing.T) {
+	app, git, dir := newIgnoreTestRepo(t)
+
+	// 取消 build/ 的精确规则，保留 *.log 对 debug.log 的忽略
+	res, err := app.SaveGitignore(dir, []string{"debug.log"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(res.Content, "/build/") {
+		t.Fatalf("取消勾选应删除精确规则：%q", res.Content)
+	}
+	if isIgnoredByGit(t, git, dir, "build/") {
+		t.Fatal("build/ 应恢复为未忽略（未跟踪）")
+	}
+	if !isIgnoredByGit(t, git, dir, "debug.log") {
+		t.Fatal("debug.log 应仍被 *.log 忽略")
+	}
+}
+
+func TestGitignoreAutoCreateAndRepoCheck(t *testing.T) {
+	git := testGitRunner(t)
 	app := &App{}
+	dir := t.TempDir()
+	mustGit(t, git, dir, "init", "-q")
+	writeTestFile(t, dir, "a.txt", "a")
+
 	ov, err := app.GetGitignoreOverview(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if ov.Exists {
-		t.Fatal("新目录不应存在 .gitignore")
+		t.Fatal("新仓库不应存在 .gitignore")
 	}
-	if len(ov.Entries) != 4 {
-		t.Fatalf("应列出 4 个候选条目（排除 .git/.gitignore），实际 %d: %+v", len(ov.Entries), ov.Entries)
-	}
-
-	created, err := app.SaveGitignore(dir, []string{"node_modules", ".env", "../evil", "not-exist"})
+	res, err := app.SaveGitignore(dir, []string{"a.txt"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !created.Created || !created.OK {
-		t.Fatalf("应自动创建 .gitignore：%+v", created)
+	if !res.Created || !strings.Contains(res.Content, "/a.txt") {
+		t.Fatalf("应自动创建 .gitignore：%+v", res)
 	}
-	for _, rule := range []string{"/node_modules/", "/.env"} {
-		if !strings.Contains(created.Content, rule) {
-			t.Fatalf("缺少规则 %q，内容：%q", rule, created.Content)
-		}
-	}
-	if strings.Contains(created.Content, "evil") || strings.Contains(created.Content, "not-exist") {
-		t.Fatalf("不应写入非法路径：%q", created.Content)
+	if _, err := os.Stat(filepath.Join(dir, gitignoreName)); err != nil {
+		t.Fatal("保存后 .gitignore 应存在")
 	}
 
-	// 混入用户手写规则，保存时不得丢失；取消勾选要能删掉精确规则
-	custom := "# 自定义注释\n*.log\n/node_modules/\n/.env\n"
-	if err := os.WriteFile(filepath.Join(dir, gitignoreName), []byte(custom), 0644); err != nil {
-		t.Fatal(err)
+	// 普通目录不是仓库，必须明确报错
+	plain := t.TempDir()
+	writeTestFile(t, plain, "b.txt", "b")
+	if _, err := app.GetGitignoreOverview(plain); err == nil || !strings.Contains(err.Error(), "不是 Git 仓库") {
+		t.Fatalf("非仓库目录应报错，实际：%v", err)
 	}
-	ov2, err := app.GetGitignoreOverview(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ignored := map[string]bool{}
-	for _, e := range ov2.Entries {
-		ignored[e.Name] = e.Ignored
-	}
-	if !ignored["node_modules"] || !ignored[".env"] || ignored["src"] {
-		t.Fatalf("忽略状态识别错误：%+v", ignored)
-	}
-
-	res, err := app.SaveGitignore(dir, []string{".env"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Created {
-		t.Fatal("已存在的文件不应标记为新建")
-	}
-	for _, keep := range []string{"# 自定义注释", "*.log", "/.env"} {
-		if !strings.Contains(res.Content, keep) {
-			t.Fatalf("应保留 %q，内容：%q", keep, res.Content)
-		}
-	}
-	if strings.Contains(res.Content, "node_modules") {
-		t.Fatalf("取消勾选后应移除规则，内容：%q", res.Content)
-	}
-
-	ov3, err := app.GetGitignoreOverview(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range ov3.Entries {
-		if e.Name == "node_modules" && e.Ignored {
-			t.Fatal("node_modules 应恢复为未忽略")
-		}
+	if _, err := app.SaveGitignore(plain, []string{"b.txt"}, false); err == nil {
+		t.Fatal("非仓库目录不应允许写入 .gitignore")
 	}
 }

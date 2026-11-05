@@ -52,6 +52,6 @@ export function ResolveDroppedPath(arg1:string):Promise<string>;
 
 export function RevealInExplorer(arg1:string):Promise<void>;
 
-export function SaveGitignore(arg1:string,arg2:Array<string>):Promise<main.IgnoreSaveResult>;
+export function SaveGitignore(arg1:string,arg2:Array<string>,arg3:boolean):Promise<main.IgnoreSaveResult>;
 
 export function SaveSettings(arg1:main.Settings):Promise<main.Settings>;

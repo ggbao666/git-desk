@@ -36,7 +36,7 @@
           </div>
         </div>
         <div class="head-actions">
-        <button id="wc-ignore" class="btn ghost compact" title="选择目录并编辑它的 .gitignore">
+        <button id="wc-ignore" class="btn ghost compact" title="选择 Git 仓库（或仓库内任意目录）并编辑它的 .gitignore">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
           忽略规则
         </button>
@@ -295,19 +295,36 @@
   <!-- ==================== .gitignore 编辑器 ==================== -->
   <div id="ignore-modal" class="modal-mask" hidden>
     <div class="modal ignore-modal" role="dialog" aria-modal="true" aria-label="编辑 .gitignore">
-      <div class="modal-head"><h2>编辑 .gitignore</h2><button id="ignore-close" class="icon-btn" aria-label="关闭">×</button></div>
+      <div class="modal-head">
+        <h2>编辑 .gitignore</h2>
+        <button id="ignore-close" class="icon-btn" aria-label="关闭">×</button>
+      </div>
       <div class="modal-body">
         <div id="ignore-dir" class="ignore-dir" title=""></div>
         <div id="ignore-state" class="ignore-state"></div>
         <div class="ignore-toolbar">
-          <span>目录内容（勾选 = 忽略）</span>
+          <input id="ignore-search" class="ignore-search" type="text" placeholder="搜索文件…" autocomplete="off" />
+          <select id="ignore-filter" class="ignore-filter" aria-label="按 Git 状态筛选">
+            <option value="all">全部状态</option>
+            <option value="untracked">未跟踪</option>
+            <option value="ignored">已忽略</option>
+            <option value="modified">已修改</option>
+            <option value="tracked">已跟踪</option>
+          </select>
+        </div>
+        <div class="ignore-toolbar sub">
+          <span id="ignore-counts" class="ignore-counts">仓库文件（勾选 = 加入忽略）</span>
           <span class="ignore-tools">
             <button id="ignore-select-all" class="text-btn">全选</button>
             <button id="ignore-select-none" class="text-btn">全不选</button>
           </span>
         </div>
         <div id="ignore-list" class="ignore-list"></div>
-        <p class="field-hint">仅管理当前目录一层的精确规则；注释和 *.log 之类的自定义规则会原样保留。</p>
+        <label class="ignore-option" title="Git 会继续跟踪已在索引中的文件，即使写进了 .gitignore；勾选后保存会执行 git rm --cached，文件保留在本地，变更随下次提交生效">
+          <input id="ignore-untrack" type="checkbox" checked />
+          <span>已跟踪文件加入忽略时，也从 Git 索引移除（保留本地文件）</span>
+        </label>
+        <p class="field-hint" title="仅管理精确规则；注释与 *.log 等自定义规则原样保留，移出被通配符忽略的文件会自动写入 ! 例外规则。">精确规则可增删；自定义通配符规则保留，移出时写 ! 例外规则。</p>
       </div>
       <div class="modal-foot">
         <button id="ignore-cancel" class="btn ghost">取消</button>
